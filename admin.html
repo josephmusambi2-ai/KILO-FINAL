@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Store — Kilo Auto Spares</title>
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-body">
+
+<!-- LOGIN GATE -->
+<div class="login-screen" id="login-screen">
+  <form class="login-card" id="login-form">
+    <div class="login-eyebrow">Kilo Auto Spares</div>
+    <h1 class="login-title">Manage Store</h1>
+    <p class="login-copy">Enter the admin password to add, edit, or remove parts, brands, and categories.</p>
+    <input type="password" id="login-password" class="login-input" placeholder="Admin password" autocomplete="current-password">
+    <button type="submit" class="btn btn-accent login-btn">Enter</button>
+    <p class="login-error" id="login-error"></p>
+    <a href="index.html" class="login-back">← Back to the site</a>
+  </form>
+</div>
+
+<!-- ADMIN DASHBOARD (hidden until login) -->
+<div class="admin-wrap" id="admin-wrap" hidden>
+
+  <header class="admin-header">
+    <div class="admin-header-inner">
+      <div class="admin-brand">
+        <div class="brand-mark">KILO <span>AUTO</span> SPARES</div>
+        <div class="admin-header-sub">Manage Store</div>
+      </div>
+      <div class="admin-header-actions">
+        <a href="shop.html" class="btn btn-outline" target="_blank" rel="noopener">View shop ↗</a>
+        <button class="btn btn-outline" id="logout-btn">Log out</button>
+      </div>
+    </div>
+    <div class="hazard-strip"></div>
+  </header>
+
+  <main class="admin-main">
+
+    <!-- Supabase status banner — content is set dynamically by admin.js -->
+    <section class="publish-banner" id="publish-banner">
+      <div class="publish-banner-text">Connecting to Supabase…</div>
+    </section>
+
+    <nav class="admin-tabs" id="admin-tabs">
+      <button class="admin-tab active" data-tab="parts">Parts <span class="admin-tab-count" id="tab-count-parts"></span></button>
+      <button class="admin-tab" data-tab="brands">Brands</button>
+      <button class="admin-tab" data-tab="categories">Categories</button>
+    </nav>
+
+    <!-- PARTS TAB -->
+    <section class="admin-panel" id="panel-parts">
+
+      <div class="panel-card" id="part-form-card">
+        <div class="panel-card-title" id="part-form-title">Add a new part</div>
+        <form id="part-form" class="part-form">
+          <div class="form-grid">
+            <label class="field">
+              <span>Photo</span>
+              <div class="photo-upload">
+                <div class="photo-preview" id="photo-preview">No photo</div>
+                <input type="file" id="part-image-input" accept="image/*">
+                <button type="button" class="btn btn-outline btn-small" id="photo-remove-btn">Remove photo</button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>Part name</span>
+              <input type="text" id="field-name" placeholder="e.g. Front Brake Pad Set — Ceramic" required>
+            </label>
+
+            <label class="field">
+              <span>Brand</span>
+              <select id="field-brand" required></select>
+            </label>
+
+            <label class="field">
+              <span>Category</span>
+              <select id="field-category" required></select>
+            </label>
+
+            <label class="field">
+              <span>Price (<span class="js-currency">KSh</span>) — internal reference only, not shown to customers</span>
+              <input type="number" id="field-price" min="0" step="1" placeholder="3500" required>
+            </label>
+
+            <label class="field">
+              <span>Stock (quantity on hand)</span>
+              <input type="number" id="field-stock" min="0" step="1" placeholder="10" required>
+            </label>
+
+            <label class="field">
+              <span>Part code / SKU</span>
+              <input type="text" id="field-id" placeholder="auto-generated">
+            </label>
+
+            <label class="field field-wide">
+              <span>Fits (make, model, years — shown to customers)</span>
+              <input type="text" id="field-fitment" placeholder="e.g. Toyota Corolla 2010–2019, Toyota Auris 2012–2018" required>
+            </label>
+
+            <label class="field field-wide">
+              <span>Description</span>
+              <textarea id="field-description" rows="2" placeholder="Short description shown on the part page"></textarea>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-accent" id="part-save-btn">Add part</button>
+            <button type="button" class="btn btn-outline" id="part-cancel-btn" hidden>Cancel edit</button>
+            <span class="form-error" id="part-form-error"></span>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-card-title-row">
+          <div class="panel-card-title">All parts</div>
+          <input type="text" id="admin-search" class="admin-search-input" placeholder="Filter by name, code, or brand…">
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table" id="parts-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Part</th>
+                <th>Brand</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Stock</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="parts-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- BRANDS TAB -->
+    <section class="admin-panel" id="panel-brands" hidden>
+      <div class="panel-card">
+        <div class="panel-card-title">Brands</div>
+        <p class="panel-card-hint">These show up as filter chips on the shop page and in the Brand dropdown when adding a part.</p>
+        <form class="inline-add-form" id="brand-add-form">
+          <input type="text" id="brand-add-input" placeholder="e.g. Isuzu">
+          <button type="submit" class="btn btn-accent btn-small">Add brand</button>
+        </form>
+        <span class="form-error" id="brand-form-error"></span>
+        <div class="tag-list" id="brand-list"></div>
+      </div>
+    </section>
+
+    <!-- CATEGORIES TAB -->
+    <section class="admin-panel" id="panel-categories" hidden>
+      <div class="panel-card">
+        <div class="panel-card-title">Categories (aisles)</div>
+        <p class="panel-card-hint">These control the "aisles" parts are grouped into on the shop page, and the category dropdown when adding a part.</p>
+        <form class="inline-add-form" id="category-add-form">
+          <input type="text" id="category-add-input" placeholder="e.g. Transmission">
+          <button type="submit" class="btn btn-accent btn-small">Add category</button>
+        </form>
+        <span class="form-error" id="category-form-error"></span>
+        <div class="tag-list" id="category-list"></div>
+      </div>
+    </section>
+
+    <section class="danger-zone">
+      <div>
+        <div class="danger-zone-title">Reset to shipped catalog</div>
+        <p class="danger-zone-copy">Deletes everything in your Supabase database and replaces it with the starter catalog from products.js. This affects every visitor immediately and cannot be undone.</p>
+      </div>
+      <button class="btn btn-outline btn-danger" id="reset-btn">Reset to shipped catalog</button>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Supabase JS (CDN) — must come before supabase-config.js and store.js -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+
+<script src="config.js"></script>
+<script src="products.js"></script>
+<script src="store.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
