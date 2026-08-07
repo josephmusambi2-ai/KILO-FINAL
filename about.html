@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About Us — Kilo Auto Spares Ltd.</title>
+<meta name="description" content="Kilo Auto Spares Ltd. is a Nairobi-based supplier of genuine and aftermarket auto parts for a wide range of vehicle brands. Learn about our shop, hours, and how ordering works.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-mark js-shop-name">KILO <span>AUTO</span> SPARES</div>
+      <div class="brand-tagline js-tagline">Genuine &amp; Aftermarket Auto Parts</div>
+    </div>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="about.html" class="active">About</a>
+      <a href="shop.html">Shop</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="cart-btn" aria-label="Open enquiry list">
+        🛒
+        <span class="cart-count" id="cart-count">0</span>
+      </button>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Open menu">☰</button>
+    </div>
+  </div>
+  <div class="mobile-nav" id="mobile-nav">
+    <a href="index.html">Home</a>
+    <a href="about.html" class="active">About</a>
+    <a href="shop.html">Shop</a>
+  </div>
+  <div class="hazard-strip"></div>
+</header>
+
+<section class="page-hero">
+  <div class="page-hero-inner">
+    <h1>About Kilo Auto Spares</h1>
+    <p>A Nairobi-based supplier of genuine and aftermarket auto parts, built for drivers and workshops who need the right part the first time.</p>
+  </div>
+</section>
+
+<div class="about-content">
+
+  <div class="about-block">
+    <h2>Genuine parts, delivered on time</h2>
+    <p>Every part we list is sourced and verified against the fitment shown on the page — the make, model and year you see is the vehicle it's built for, not an approximation. Where we stock aftermarket alternatives alongside genuine parts, both are clearly labelled, so you can choose based on budget without any guesswork about what you're actually buying.</p>
+    <p>Once you send an enquiry, we confirm stock and price the same day and agree a firm delivery or pickup window with you upfront — no open-ended "we'll get back to you." For deliveries, we coordinate directly so you know exactly when your part is arriving, and for pickup, your order is set aside and ready the moment you walk in.</p>
+  </div>
+
+  <div class="about-block">
+    <h2>Who we are</h2>
+    <p>Kilo Auto Spares Ltd. supplies genuine and aftermarket parts for a wide range of vehicle makes and models on Kenyan roads. Every listing in our shop shows the brand, category, and exact fitment — make, model and year — so you can confirm a part fits before you ever have to ask.</p>
+    <p>We keep the ordering process simple on purpose: browse or search, build your list, and send it to us on WhatsApp or email. We take it from there — confirming price and stock, and arranging payment and delivery or pickup directly with you.</p>
+    <div class="about-photo-row" style="margin-top:18px;">
+      <img src="images/about-1.jpg" onerror="this.onerror=null;this.src='https://picsum.photos/seed/kilo-about-1/400/300';" alt="" loading="lazy">
+      <img src="images/about-2.jpg" onerror="this.onerror=null;this.src='https://picsum.photos/seed/kilo-about-2/400/300';" alt="" loading="lazy">
+      <img src="images/about-3.jpg" onerror="this.onerror=null;this.src='https://picsum.photos/seed/kilo-about-3/400/300';" alt="" loading="lazy">
+    </div>
+  </div>
+
+  <div class="about-block">
+    <h2>Our mission &amp; vision</h2>
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-card-label">Mission</div>
+        <div class="info-card-value">To provide reliable automotive spare parts at competitive prices while delivering outstanding customer service.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Vision</div>
+        <div class="info-card-value">To become the most trusted and preferred auto spare parts supplier in the region.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Who we serve</div>
+        <div class="info-card-value">Individual vehicle owners, mechanics, garages, transport companies and businesses across Kenya.</div>
+      </div>
+    </div>
+    <div class="brand-list-row" style="margin-top:16px;">
+      <span class="brand-pill">Quality</span>
+      <span class="brand-pill">Integrity</span>
+      <span class="brand-pill">Reliability</span>
+      <span class="brand-pill">Customer Satisfaction</span>
+      <span class="brand-pill">Professional Service</span>
+    </div>
+  </div>
+
+  <div class="about-block">
+    <h2>Brands we deal in</h2>
+    <div class="brand-list-row" id="about-brand-list"></div>
+  </div>
+
+  <div class="about-block">
+    <h2>Visit or reach us</h2>
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-card-label">Location</div>
+        <div class="info-card-value js-address">Enterprise Road, Industrial Area, Nairobi</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Contact</div>
+        <div class="info-card-value">
+          <a class="js-phone" href="#">+254 700 000 000</a><br>
+          <a class="js-email" href="#">orders@yourshop.shop</a>
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Opening hours</div>
+        <div class="info-card-value">
+          Weekdays: 8:00am – 5:00pm<br>
+          Saturday: 8:00am – 2:00pm<br>
+          Sundays &amp; public holidays: Closed
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="about-block">
+    <h2>How ordering works</h2>
+    <p>1. Search by vehicle fitment or browse the shop by category and brand.<br>
+    2. Add the parts you need to your enquiry list.<br>
+    3. Send your list to us on WhatsApp or by email.<br>
+    4. We reply with price and availability, then arrange payment (cash, card, or M-Pesa) and delivery or pickup with you directly.</p>
+  </div>
+
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-col footer-brand">
+      <div class="brand-mark js-shop-name">KILO AUTO SPARES LTD.</div>
+      <p style="margin-top:10px; max-width:38ch;">Quality spare parts for everyday drivers and workshops. Order online, pick up in-store or get it delivered.</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Contact</div>
+      <p class="js-phone">+254 700 000 000</p>
+      <p class="js-email">orders@yourshop.shop</p>
+      <p class="js-address">Enterprise Road, Industrial Area, Nairobi</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Site</div>
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="shop.html">Shop</a>
+      <a href="#" id="footer-cart-link">Enquiry list</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Kilo Auto Spares Ltd. All rights reserved.</span>
+    <span>Ordering via WhatsApp / Email · <a href="admin.html" class="admin-link">Manage store</a></span>
+  </div>
+</footer>
+
+<!-- Cart / enquiry drawer (kept available on every page) -->
+<div class="cart-overlay" id="cart-overlay"></div>
+<aside class="cart-drawer" id="cart-drawer">
+  <div class="cart-header">
+    <div class="cart-title">Your Enquiry List</div>
+    <button class="cart-close" id="cart-close" aria-label="Close">×</button>
+  </div>
+  <div class="cart-items" id="cart-items"></div>
+  <div class="cart-footer">
+    <div class="cart-total-row">
+      <span class="cart-total-label">Total</span>
+      <span class="cart-total-value" id="cart-total-value">0 items</span>
+    </div>
+    <div class="checkout-options">
+      <button class="btn btn-accent checkout-btn" id="checkout-whatsapp">Send via WhatsApp</button>
+      <button class="btn btn-outline checkout-btn" id="checkout-email">Send via Email</button>
+    </div>
+    <p class="checkout-note">This sends your list to us directly — we'll reply with pricing, availability, and arrange payment and delivery or pickup with you.</p>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<!-- Supabase JS (CDN) — must come before supabase-config.js and store.js -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+
+<script src="config.js"></script>
+<script src="products.js"></script>
+<script src="icons.js"></script>
+<script src="store.js"></script>
+<script src="cart.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
