@@ -1,374 +1,152 @@
 /* ============================================================
-   ADMIN — logic for admin.html (Manage Store).
-
-   All changes now go directly to Supabase and are immediately
-   live for every visitor — no download or GitHub push needed.
+   ADMIN.JS — logic for admin.html (Manage Store).
+   Handles the login gate, tab switching, part add/edit/delete,
+   brand & category management, and the "reset to shipped
+   catalog" danger-zone action. Talks to Supabase entirely
+   through the helpers already defined in store.js.
    ============================================================ */
 
-const ADMIN_SESSION_KEY = "torqueco_admin_session";
+const ADMIN_SESSION_KEY = "kilo_admin_logged_in";
 
-let editingId           = null;   // product id being edited, or null when adding
-let pendingImageFile    = null;   // File picked by user — uploaded on save
-let pendingImagePreview = null;   // blob URL for preview only
-let pendingImageRemoved = false;  // true when user clicked "Remove photo"
-let adminFilterQuery    = "";
+let editingId        = null; // product id currently being edited, or null = "add" mode
+let selectedImageFile = null; // File picked in the photo input, not yet uploaded
+let removeImageFlag   = false; // true if the user clicked "Remove photo" on an existing part
 
-/* ─────────────────────────────────────────────────────────────
-   Login
-   ───────────────────────────────────────────────────────────── */
+/* ---------- small helpers ---------- */
 
-function isLoggedIn() {
-  return sessionStorage.getItem(ADMIN_SESSION_KEY) === "yes";
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
 }
 
-async function showDashboard() {
-  setBannerLoading();
-  const result = await initStore();
+function $(id) { return document.getElementById(id); }
 
-  document.getElementById("login-screen").hidden = true;
-  document.getElementById("admin-wrap").hidden   = false;
-  document.querySelectorAll(".js-currency").forEach(el => el.textContent = SHOP_CONFIG.currencySymbol);
+/* ---------- login gate ---------- */
 
-  if (!result.ok) {
-    setBannerError(result.error);
-  } else if (result.isEmpty) {
-    setBannerEmpty();
-  } else {
-    setBannerLive();
+function showAdmin() {
+  $("login-screen").hidden = true;
+  $("admin-wrap").hidden = false;
+}
+
+function showLogin() {
+  $("login-screen").hidden = false;
+  $("admin-wrap").hidden = true;
+}
+
+function initLoginGate() {
+  if (sessionStorage.getItem(ADMIN_SESSION_KEY) === "yes") {
+    showAdmin();
+    initAdmin();
   }
 
-  populateSelects();
+  $("login-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const entered = $("login-password").value;
+    if (entered === SHOP_CONFIG.adminPassword) {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, "yes");
+      $("login-error").textContent = "";
+      $("login-password").value = "";
+      showAdmin();
+      initAdmin();
+    } else {
+      $("login-error").textContent = "Incorrect password. Try again.";
+    }
+  });
+
+  $("logout-btn").addEventListener("click", () => {
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    showLogin();
+  });
+}
+
+/* ---------- init (after login) ---------- */
+
+let adminInitialized = false;
+
+async function initAdmin() {
+  if (adminInitialized) return; // don't re-run store load every time login gate opens
+  adminInitialized = true;
+
+  document.querySelectorAll(".js-currency").forEach(el => el.textContent = SHOP_CONFIG.currencySymbol);
+
+  $("publish-banner").innerHTML = `<div class="publish-banner-text">Connecting to Supabase…</div>`;
+  const result = await initStore();
+  renderPublishBanner(result);
+
+  initTabs();
+  populateFieldDropdowns();
   renderPartsTable();
   renderBrandList();
   renderCategoryList();
-  updatePartCount();
+  initPartForm();
+  initBrandForm();
+  initCategoryForm();
+  initResetButton();
+
+  $("admin-search").addEventListener("input", renderPartsTable);
 }
 
-document.getElementById("login-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const entered = document.getElementById("login-password").value;
-  if (entered === SHOP_CONFIG.adminPassword) {
-    sessionStorage.setItem(ADMIN_SESSION_KEY, "yes");
-    document.getElementById("login-error").textContent = "";
-    showDashboard();
+function renderPublishBanner(result) {
+  const el = $("publish-banner");
+  if (result && result.ok) {
+    if (result.isEmpty) {
+      el.innerHTML = `<div class="publish-banner-text"><strong>Your Supabase database is empty.</strong> Add parts below, or use the browser console to run <code>seedFromDefaults()</code> to load the starter catalog.</div>`;
+    } else {
+      el.innerHTML = `<div class="publish-banner-text"><strong>Changes save to Supabase instantly</strong> — live for every visitor the moment you click Save.</div>`;
+    }
   } else {
-    document.getElementById("login-error").textContent = "That password isn't right. Try again.";
+    el.innerHTML = `<div class="publish-banner-text"><strong>Could not reach Supabase</strong> — showing the shipped catalog from products.js instead. Changes here won't be saved. Check supabase-config.js and your internet connection.</div>`;
   }
-});
-
-document.getElementById("logout-btn").addEventListener("click", () => {
-  sessionStorage.removeItem(ADMIN_SESSION_KEY);
-  location.reload();
-});
-
-if (isLoggedIn()) showDashboard();
-
-/* ─────────────────────────────────────────────────────────────
-   Publish banner (replaces the old "Download updated files" UI)
-   ───────────────────────────────────────────────────────────── */
-
-function setBannerLoading() {
-  const b = document.getElementById("publish-banner");
-  if (!b) return;
-  b.innerHTML = `<div class="publish-banner-text">Connecting to Supabase…</div>`;
 }
 
-function setBannerLive() {
-  const b = document.getElementById("publish-banner");
-  if (!b) return;
-  b.innerHTML = `
-    <div class="publish-banner-text">
-      <strong>Changes save to Supabase instantly</strong> — live for every visitor the moment you click Save.
-      No download or GitHub push needed.
-    </div>
-    <button class="btn btn-outline" id="refresh-btn">Refresh data</button>
-  `;
-  document.getElementById("refresh-btn").addEventListener("click", async () => {
-    document.getElementById("refresh-btn").disabled = true;
-    await initStore();
-    populateSelects();
-    renderPartsTable();
-    renderBrandList();
-    renderCategoryList();
-    updatePartCount();
-    document.getElementById("refresh-btn").disabled = false;
-    showToast("Refreshed from Supabase");
+/* ---------- tabs ---------- */
+
+function initTabs() {
+  document.querySelectorAll(".admin-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".admin-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      $("panel-parts").hidden      = tab !== "parts";
+      $("panel-brands").hidden     = tab !== "brands";
+      $("panel-categories").hidden = tab !== "categories";
+    });
   });
 }
 
-function setBannerEmpty() {
-  const b = document.getElementById("publish-banner");
-  if (!b) return;
-  b.innerHTML = `
-    <div class="publish-banner-text">
-      <strong>Your Supabase database is empty.</strong>
-      Click to seed it with the starter catalog — then add, edit, or delete parts as usual.
-    </div>
-    <button class="btn btn-accent" id="seed-btn">Seed starter catalog</button>
-  `;
-  document.getElementById("seed-btn").addEventListener("click", async () => {
-    const btn = document.getElementById("seed-btn");
-    btn.disabled = true;
-    btn.textContent = "Seeding…";
-    const result = await seedFromDefaults();
-    if (result.ok) {
-      populateSelects();
-      renderPartsTable();
-      renderBrandList();
-      renderCategoryList();
-      updatePartCount();
-      setBannerLive();
-      showToast("Starter catalog loaded into Supabase");
-    } else {
-      btn.disabled = false;
-      btn.textContent = "Seed starter catalog";
-      showToast("Error: " + result.error);
-    }
-  });
+/* ---------- dropdowns (brand / category) shared by the part form ---------- */
+
+function populateFieldDropdowns() {
+  const brandSel = $("field-brand");
+  const catSel   = $("field-category");
+  brandSel.innerHTML = BRANDS.map(b => `<option value="${b}">${b}</option>`).join("");
+  catSel.innerHTML   = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("");
 }
 
-function setBannerError(msg) {
-  const b = document.getElementById("publish-banner");
-  if (!b) return;
-  b.innerHTML = `
-    <div class="publish-banner-text">
-      <strong>Could not reach Supabase</strong> — showing the local starter catalog instead.
-      Check your internet connection or Supabase project status. (${msg || "Unknown error"})
-    </div>
-    <button class="btn btn-outline" id="retry-btn">Retry</button>
-  `;
-  document.getElementById("retry-btn").addEventListener("click", async () => {
-    setBannerLoading();
-    const result = await initStore();
-    populateSelects(); renderPartsTable(); renderBrandList(); renderCategoryList(); updatePartCount();
-    if (result.ok && result.isEmpty) setBannerEmpty();
-    else if (result.ok) setBannerLive();
-    else setBannerError(result.error);
-  });
-}
-
-function updatePartCount() {
-  const el = document.getElementById("tab-count-parts");
-  if (el) el.textContent = `(${PRODUCTS.length})`;
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Tabs
-   ───────────────────────────────────────────────────────────── */
-
-document.getElementById("admin-tabs").addEventListener("click", (e) => {
-  const btn = e.target.closest(".admin-tab");
-  if (!btn) return;
-  document.querySelectorAll(".admin-tab").forEach(b => b.classList.toggle("active", b === btn));
-  const tab = btn.dataset.tab;
-  document.getElementById("panel-parts")     .hidden = tab !== "parts";
-  document.getElementById("panel-brands")    .hidden = tab !== "brands";
-  document.getElementById("panel-categories").hidden = tab !== "categories";
-});
-
-/* ─────────────────────────────────────────────────────────────
-   Dropdown population
-   ───────────────────────────────────────────────────────────── */
-
-function populateSelects() {
-  document.getElementById("field-brand")   .innerHTML = BRANDS    .map(b => `<option value="${b}">${b}</option>`).join("");
-  document.getElementById("field-category").innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("");
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Photo upload
-   ───────────────────────────────────────────────────────────── */
-
-document.getElementById("part-image-input").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  pendingImageFile    = file;
-  pendingImageRemoved = false;
-  if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview);
-  pendingImagePreview = URL.createObjectURL(file);
-  showPhotoPreview(pendingImagePreview);
-});
-
-document.getElementById("photo-remove-btn").addEventListener("click", () => {
-  pendingImageFile    = null;
-  pendingImageRemoved = true;
-  if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview);
-  pendingImagePreview = null;
-  document.getElementById("part-image-input").value = "";
-  showPhotoPreview(null);
-});
-
-function showPhotoPreview(url) {
-  const el = document.getElementById("photo-preview");
-  el.innerHTML = url ? `<img src="${url}" alt="Preview">` : "No photo";
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Part form (add / edit)
-   ───────────────────────────────────────────────────────────── */
-
-const partForm     = document.getElementById("part-form");
-const partIdField  = document.getElementById("field-id");
-const partNameField = document.getElementById("field-name");
-
-partNameField.addEventListener("input", () => {
-  if (!editingId && !partIdField.dataset.touched) partIdField.value = "";
-});
-partIdField.addEventListener("input", () => { partIdField.dataset.touched = "1"; });
-
-partForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const errorEl = document.getElementById("part-form-error");
-  errorEl.textContent = "";
-
-  const name        = partNameField.value.trim();
-  const brand       = document.getElementById("field-brand")      .value;
-  const category    = document.getElementById("field-category")   .value;
-  const price       = Number(document.getElementById("field-price").value);
-  const stock       = Number(document.getElementById("field-stock").value);
-  const fitment     = document.getElementById("field-fitment")    .value.trim();
-  const description = document.getElementById("field-description").value.trim();
-  let   id          = partIdField.value.trim();
-
-  if (!name || !fitment || isNaN(price) || isNaN(stock)) {
-    errorEl.textContent = "Fill in the part name, fitment, price, and stock.";
-    return;
-  }
-
-  const saveBtn = document.getElementById("part-save-btn");
-  saveBtn.disabled    = true;
-  saveBtn.textContent = editingId ? "Saving…" : "Adding…";
-
-  try {
-    if (editingId) {
-      // Resolve image: upload new file, remove, or keep existing
-      let imageUpdate = {};
-      if (pendingImageFile) {
-        try {
-          const url = await uploadProductImage(pendingImageFile, editingId);
-          imageUpdate = { image: url };
-        } catch (imgErr) {
-          errorEl.textContent = "Photo upload failed: " + imgErr.message;
-          return;
-        }
-      } else if (pendingImageRemoved) {
-        imageUpdate = { image: undefined }; // undefined → remove
-      }
-      // Build updates — only include image key if it changed
-      const updates = { name, brand, category, price, stock, fitment, description, ...imageUpdate };
-      const result = await updateProduct(editingId, updates);
-      if (!result.ok) { errorEl.textContent = result.error; return; }
-      showToast("Part updated");
-    } else {
-      if (!id) id = suggestProductId(brand, category);
-      let imageUrl;
-      if (pendingImageFile) {
-        try {
-          imageUrl = await uploadProductImage(pendingImageFile, id);
-        } catch (imgErr) {
-          errorEl.textContent = "Photo upload failed: " + imgErr.message;
-          return;
-        }
-      }
-      const product = { id, name, brand, category, price, stock, fitment, description, image: imageUrl };
-      const result = await addProduct(product);
-      if (!result.ok) { errorEl.textContent = result.error; return; }
-      showToast("Part added");
-    }
-
-    resetPartForm();
-    renderPartsTable();
-    updatePartCount();
-  } finally {
-    saveBtn.disabled    = false;
-    saveBtn.textContent = editingId ? "Save changes" : "Add part";
-  }
-});
-
-document.getElementById("part-cancel-btn").addEventListener("click", resetPartForm);
-
-function resetPartForm() {
-  editingId           = null;
-  pendingImageFile    = null;
-  pendingImageRemoved = false;
-  if (pendingImagePreview) { URL.revokeObjectURL(pendingImagePreview); pendingImagePreview = null; }
-  partForm.reset();
-  partIdField.dataset.touched = "";
-  partIdField.placeholder = "auto-generated";
-  showPhotoPreview(null);
-  document.getElementById("part-form-title")  .textContent = "Add a new part";
-  document.getElementById("part-save-btn")    .textContent = "Add part";
-  document.getElementById("part-cancel-btn")  .hidden      = true;
-  document.getElementById("part-form-error")  .textContent = "";
-}
-
-function startEditProduct(id) {
-  const p = findProduct(id);
-  if (!p) return;
-  editingId           = id;
-  pendingImageFile    = null;
-  pendingImageRemoved = false;
-  pendingImagePreview = null;
-
-  partIdField.value                                              = p.id;
-  partIdField.dataset.touched                                    = "1";
-  partNameField.value                                            = p.name;
-  document.getElementById("field-brand")    .value              = p.brand    || BRANDS[0];
-  document.getElementById("field-category") .value              = p.category || CATEGORIES[0];
-  document.getElementById("field-price")    .value              = p.price;
-  document.getElementById("field-stock")    .value              = p.stock;
-  document.getElementById("field-fitment")  .value              = p.fitment     || "";
-  document.getElementById("field-description").value            = p.description || "";
-  showPhotoPreview(p.image || null);
-
-  document.getElementById("part-form-title").textContent = `Editing: ${p.name}`;
-  document.getElementById("part-save-btn")  .textContent = "Save changes";
-  document.getElementById("part-cancel-btn").hidden      = false;
-  document.getElementById("part-form-error").textContent = "";
-  document.getElementById("part-form-card") .scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-async function deleteProductWithConfirm(id) {
-  const p = findProduct(id);
-  if (!p) return;
-  if (!confirm(`Delete "${p.name}" (${p.id})? This removes it from Supabase immediately.`)) return;
-  const result = await deleteProduct(id);
-  if (!result.ok) { showToast("Error: " + result.error); return; }
-  if (editingId === id) resetPartForm();
-  showToast("Part deleted");
-  renderPartsTable();
-  updatePartCount();
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Parts table
-   ───────────────────────────────────────────────────────────── */
-
-document.getElementById("admin-search").addEventListener("input", (e) => {
-  adminFilterQuery = e.target.value;
-  renderPartsTable();
-});
+/* ---------- parts table ---------- */
 
 function renderPartsTable() {
-  const q    = adminFilterQuery.trim().toLowerCase();
+  $("tab-count-parts").textContent = `(${PRODUCTS.length})`;
+  const q = ($("admin-search").value || "").trim().toLowerCase();
   const rows = PRODUCTS.filter(p =>
     !q ||
-    p.name    .toLowerCase().includes(q) ||
-    p.id      .toLowerCase().includes(q) ||
-    (p.brand     || "").toLowerCase().includes(q) ||
-    (p.category  || "").toLowerCase().includes(q)
+    p.name.toLowerCase().includes(q) ||
+    p.id.toLowerCase().includes(q) ||
+    (p.brand || "").toLowerCase().includes(q)
   );
 
-  const tbody = document.getElementById("parts-table-body");
-  document.getElementById("tab-count-parts").textContent = `(${PRODUCTS.length})`;
-
+  const body = $("parts-table-body");
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px;">No parts match "${adminFilterQuery}".</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted); padding:18px 10px;">No parts match.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = rows.map(p => {
-    const thumb    = p.image
+  body.innerHTML = rows.map(p => {
+    const thumb = p.image
       ? `<img class="admin-thumb" src="${p.image}" alt="">`
       : `<div class="admin-thumb-empty"></div>`;
     const stockCls = p.stock <= 0 ? "admin-stock-out" : (p.stock <= 5 ? "admin-stock-warning" : "");
@@ -379,7 +157,7 @@ function renderPartsTable() {
           <span class="admin-part-name">${p.name}</span>
           <span class="admin-part-sku">${p.id}</span>
         </td>
-        <td>${p.brand || "—"}</td>
+        <td>${p.brand || ""}</td>
         <td>${p.category}</td>
         <td>${SHOP_CONFIG.currencySymbol} ${Number(p.price).toLocaleString()}</td>
         <td class="${stockCls}">${p.stock}</td>
@@ -393,112 +171,234 @@ function renderPartsTable() {
     `;
   }).join("");
 
-  tbody.querySelectorAll("[data-edit]")  .forEach(btn => btn.addEventListener("click", ()  => startEditProduct(btn.dataset.edit)));
-  tbody.querySelectorAll("[data-delete]").forEach(btn => btn.addEventListener("click", ()  => deleteProductWithConfirm(btn.dataset.delete)));
+  body.querySelectorAll("[data-edit]").forEach(btn => {
+    btn.addEventListener("click", () => startEditPart(btn.dataset.edit));
+  });
+  body.querySelectorAll("[data-delete]").forEach(btn => {
+    btn.addEventListener("click", () => handleDeletePart(btn.dataset.delete));
+  });
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Brands
-   ───────────────────────────────────────────────────────────── */
+async function handleDeletePart(id) {
+  const p = findProduct(id);
+  if (!p) return;
+  if (!confirm(`Delete "${p.name}" (${id})? This can't be undone.`)) return;
+  const res = await deleteProduct(id);
+  if (!res.ok) {
+    showToast(res.error || "Could not delete that part.");
+    return;
+  }
+  showToast("Part deleted");
+  renderPartsTable();
+  if (editingId === id) resetPartForm();
+}
 
-document.getElementById("brand-add-form").addEventListener("submit", async (e) => {
+/* ---------- part form (add / edit) ---------- */
+
+function initPartForm() {
+  $("part-image-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    selectedImageFile = file;
+    removeImageFlag = false;
+    const reader = new FileReader();
+    reader.onload = () => {
+      $("photo-preview").innerHTML = `<img src="${reader.result}" alt="">`;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  $("photo-remove-btn").addEventListener("click", () => {
+    selectedImageFile = null;
+    removeImageFlag = true;
+    $("part-image-input").value = "";
+    $("photo-preview").innerHTML = "No photo";
+  });
+
+  $("part-cancel-btn").addEventListener("click", resetPartForm);
+
+  $("part-form").addEventListener("submit", handlePartFormSubmit);
+}
+
+function startEditPart(id) {
+  const p = findProduct(id);
+  if (!p) return;
+  editingId = id;
+  selectedImageFile = null;
+  removeImageFlag = false;
+
+  $("part-form-title").textContent = `Edit part — ${p.id}`;
+  $("field-name").value = p.name;
+  $("field-brand").value = p.brand || "Universal";
+  $("field-category").value = p.category;
+  $("field-price").value = p.price;
+  $("field-stock").value = p.stock;
+  $("field-id").value = p.id;
+  $("field-id").disabled = true; // don't let the SKU change on an existing part
+  $("field-fitment").value = p.fitment || "";
+  $("field-description").value = p.description || "";
+  $("photo-preview").innerHTML = p.image ? `<img src="${p.image}" alt="">` : "No photo";
+
+  $("part-save-btn").textContent = "Save changes";
+  $("part-cancel-btn").hidden = false;
+  $("part-form-error").textContent = "";
+
+  $("part-form-card").scrollIntoView({ behavior: "smooth" });
+}
+
+function resetPartForm() {
+  editingId = null;
+  selectedImageFile = null;
+  removeImageFlag = false;
+  $("part-form").reset();
+  $("field-id").disabled = false;
+  $("photo-preview").innerHTML = "No photo";
+  $("part-form-title").textContent = "Add a new part";
+  $("part-save-btn").textContent = "Add part";
+  $("part-cancel-btn").hidden = true;
+  $("part-form-error").textContent = "";
+}
+
+async function handlePartFormSubmit(e) {
   e.preventDefault();
-  const input   = document.getElementById("brand-add-input");
-  const errorEl = document.getElementById("brand-form-error");
-  const result  = await addBrand(input.value);
-  if (!result.ok) { errorEl.textContent = result.error; return; }
-  errorEl.textContent = "";
-  input.value = "";
-  populateSelects();
-  renderBrandList();
-  showToast("Brand added");
-});
+  const errEl = $("part-form-error");
+  errEl.textContent = "";
+
+  const brand    = $("field-brand").value;
+  const category = $("field-category").value;
+  const data = {
+    name:        $("field-name").value.trim(),
+    brand,
+    category,
+    price:       $("field-price").value,
+    stock:       $("field-stock").value,
+    fitment:     $("field-fitment").value.trim(),
+    description: $("field-description").value.trim()
+  };
+
+  if (!data.name || !data.fitment) {
+    errEl.textContent = "Please fill in the required fields.";
+    return;
+  }
+
+  $("part-save-btn").disabled = true;
+
+  try {
+    // Upload a new photo if one was picked
+    if (selectedImageFile) {
+      const tempId = editingId || $("field-id").value.trim() || suggestProductId(brand, category);
+      data.image = await uploadProductImage(selectedImageFile, tempId);
+    } else if (removeImageFlag) {
+      data.image = null;
+    }
+
+    let res;
+    if (editingId) {
+      res = await updateProduct(editingId, data);
+    } else {
+      const id = $("field-id").value.trim() || suggestProductId(brand, category);
+      res = await addProduct({ ...data, id });
+    }
+
+    if (!res.ok) {
+      errEl.textContent = res.error || "Could not save that part.";
+      return;
+    }
+
+    showToast(editingId ? "Part updated" : "Part added");
+    resetPartForm();
+    renderPartsTable();
+  } catch (err) {
+    errEl.textContent = err.message || "Something went wrong saving that part.";
+  } finally {
+    $("part-save-btn").disabled = false;
+  }
+}
+
+/* ---------- brands tab ---------- */
 
 function renderBrandList() {
-  const list = document.getElementById("brand-list");
+  const list = $("brand-list");
   list.innerHTML = BRANDS.map(b => `
-    <span class="tag-pill">${b} <button type="button" data-remove-brand="${b}" title="Remove ${b}">×</button></span>
+    <span class="tag-pill">${b} <button data-remove-brand="${b}" aria-label="Remove ${b}">×</button></span>
   `).join("");
   list.querySelectorAll("[data-remove-brand]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      const result  = await removeBrand(btn.dataset.removeBrand);
-      const errorEl = document.getElementById("brand-form-error");
-      if (!result.ok) { errorEl.textContent = result.error; return; }
-      errorEl.textContent = "";
-      populateSelects();
+      const res = await removeBrand(btn.dataset.removeBrand);
+      if (!res.ok) { showToast(res.error); return; }
       renderBrandList();
+      populateFieldDropdowns();
       showToast("Brand removed");
     });
   });
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Categories
-   ───────────────────────────────────────────────────────────── */
+function initBrandForm() {
+  $("brand-add-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = $("brand-add-input");
+    const errEl = $("brand-form-error");
+    const res = await addBrand(input.value);
+    if (!res.ok) { errEl.textContent = res.error; return; }
+    errEl.textContent = "";
+    input.value = "";
+    renderBrandList();
+    populateFieldDropdowns();
+    showToast("Brand added");
+  });
+}
 
-document.getElementById("category-add-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const input   = document.getElementById("category-add-input");
-  const errorEl = document.getElementById("category-form-error");
-  const result  = await addCategory(input.value);
-  if (!result.ok) { errorEl.textContent = result.error; return; }
-  errorEl.textContent = "";
-  input.value = "";
-  populateSelects();
-  renderCategoryList();
-  showToast("Category added");
-});
+/* ---------- categories tab ---------- */
 
 function renderCategoryList() {
-  const list = document.getElementById("category-list");
+  const list = $("category-list");
   list.innerHTML = CATEGORIES.map(c => `
-    <span class="tag-pill">${c} <button type="button" data-remove-cat="${c}" title="Remove ${c}">×</button></span>
+    <span class="tag-pill">${c} <button data-remove-cat="${c}" aria-label="Remove ${c}">×</button></span>
   `).join("");
   list.querySelectorAll("[data-remove-cat]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      const result  = await removeCategory(btn.dataset.removeCat);
-      const errorEl = document.getElementById("category-form-error");
-      if (!result.ok) { errorEl.textContent = result.error; return; }
-      errorEl.textContent = "";
-      populateSelects();
+      const res = await removeCategory(btn.dataset.removeCat);
+      if (!res.ok) { showToast(res.error); return; }
       renderCategoryList();
+      populateFieldDropdowns();
       showToast("Category removed");
     });
   });
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Reset (wipes Supabase and re-seeds from shipped defaults)
-   ───────────────────────────────────────────────────────────── */
-
-document.getElementById("reset-btn").addEventListener("click", async () => {
-  if (!confirm(
-    "Reset the ENTIRE Supabase catalog back to the starter catalog?\n\n" +
-    "This will permanently delete every part, brand, and category you've added or changed — " +
-    "for every visitor. This cannot be undone."
-  )) return;
-  const btn = document.getElementById("reset-btn");
-  btn.disabled = true; btn.textContent = "Resetting…";
-  const result = await resetToShipped();
-  btn.disabled = false; btn.textContent = "Reset to shipped catalog";
-  if (result.ok) {
-    populateSelects(); renderPartsTable(); renderBrandList(); renderCategoryList(); updatePartCount();
-    setBannerLive();
-    showToast("Reset to starter catalog");
-  } else {
-    showToast("Reset failed: " + result.error);
-  }
-});
-
-/* ─────────────────────────────────────────────────────────────
-   Toast
-   ───────────────────────────────────────────────────────────── */
-
-function showToast(message) {
-  const toast = document.getElementById("toast");
-  if (!toast) return;
-  toast.textContent = message;
-  toast.classList.add("show");
-  clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+function initCategoryForm() {
+  $("category-add-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = $("category-add-input");
+    const errEl = $("category-form-error");
+    const res = await addCategory(input.value);
+    if (!res.ok) { errEl.textContent = res.error; return; }
+    errEl.textContent = "";
+    input.value = "";
+    renderCategoryList();
+    populateFieldDropdowns();
+    showToast("Category added");
+  });
 }
+
+/* ---------- danger zone ---------- */
+
+function initResetButton() {
+  $("reset-btn").addEventListener("click", async () => {
+    if (!confirm("This deletes EVERYTHING in your Supabase database and replaces it with the starter catalog from products.js. This affects every visitor immediately and cannot be undone. Continue?")) return;
+    $("reset-btn").disabled = true;
+    const res = await resetToShipped();
+    $("reset-btn").disabled = false;
+    if (!res.ok) { showToast(res.error || "Reset failed."); return; }
+    showToast("Reset to shipped catalog");
+    renderPublishBanner(res);
+    populateFieldDropdowns();
+    renderPartsTable();
+    renderBrandList();
+    renderCategoryList();
+  });
+}
+
+/* ---------- boot ---------- */
+
+document.addEventListener("DOMContentLoaded", initLoginGate);
