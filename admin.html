@@ -152,8 +152,8 @@
                     </div>
 
                     <div id="bulkDropzone" class="bg-slate-900/60 border border-dashed border-emerald-600/40 rounded-lg p-4 transition cursor-pointer" tabindex="0">
-                        <p class="text-xs text-slate-300 mb-1"><i class="fa-solid fa-file-excel text-emerald-500 mr-1"></i> <strong>Or add many parts at once</strong> — upload an Excel file and every row in it becomes a product in the Category/Subcategory picked above.</p>
-                        <p class="text-[11px] text-slate-500 mb-3">Columns needed: <code class="text-emerald-400">Name</code>, <code class="text-emerald-400">Price</code>. Optional: <code class="text-emerald-400">Brand</code>, <code class="text-emerald-400">OriginalPrice</code>, <code class="text-emerald-400">Description</code>, <code class="text-emerald-400">Image</code> (a photo link — or just paste actual pictures into the cells and they'll be pulled out automatically). You don't need Category/Subcategory columns — the picker above handles that.</p>
+                        <p class="text-xs text-slate-300 mb-1"><i class="fa-solid fa-file-excel text-emerald-500 mr-1"></i> <strong>Or add many parts at once</strong> — every row in the file becomes a product.</p>
+                        <p class="text-[11px] text-slate-500 mb-3">Columns needed: <code class="text-emerald-400">Name</code>, <code class="text-emerald-400">Price</code>. Optional: <code class="text-emerald-400">Brand</code>, <code class="text-emerald-400">OriginalPrice</code>, <code class="text-emerald-400">Description</code>, <code class="text-emerald-400">Image</code>, <code class="text-emerald-400">Category</code>, <code class="text-emerald-400">Subcategory</code>. <strong>A single file can mix multiple categories</strong> — just add a Category column (and Subcategory if you like) and each row goes to its own section automatically. Any row that leaves Category blank, or uses one that doesn't match, falls back to the Category/Subcategory picked above.</p>
                         <div class="flex flex-wrap items-center gap-3">
                             <label class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition cursor-pointer">
                                 <i class="fa-solid fa-upload"></i> Choose File
@@ -161,6 +161,7 @@
                             </label>
                             <span id="bulkDropzoneHint" class="text-[11px] text-slate-500">...or drag a file here, or click anywhere in this box and paste (Ctrl/Cmd+V)</span>
                         </div>
+                        <div id="bulkUploadStatus" class="hidden mt-3 text-xs rounded-lg p-3 border"></div>
                     </div>
 
                     <div>

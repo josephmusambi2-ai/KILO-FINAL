@@ -108,6 +108,8 @@ function openProductModal(id) {
   editingImageDataUrl = null;
   document.getElementById('pImagePreview').classList.add('hidden');
   document.getElementById('pImageUrl').value = '';
+  const statusEl = document.getElementById('bulkUploadStatus');
+  if (statusEl) { statusEl.classList.add('hidden'); statusEl.textContent = ''; }
 
   if (id) {
     const products = loadDraftProducts();
@@ -213,6 +215,7 @@ const FIELD_ALIASES = {
   brand: ['brand', 'make', 'manufacturer'],
   price: ['price', 'sellingprice', 'cost', 'kes', 'kshs', 'pricekshs', 'amount'],
   originalprice: ['originalprice', 'oldprice', 'wasprice', 'rrp', 'listprice', 'beforeprice'],
+  category: ['category', 'cat', 'section', 'department'],
   subcategory: ['subcategory', 'sub', 'subcat'],
   description: ['description', 'desc', 'details', 'notes', 'makemodel', 'compatibility', 'compatiblewith'],
   image: ['image', 'imageurl', 'photo', 'photourl', 'picture', 'img', 'productimagelink']
@@ -258,23 +261,68 @@ function normalizeRow(rawRow, headerLookup) {
     brand: String(out.brand || '').trim(),
     price,
     originalPrice: (originalPrice && originalPrice > price) ? originalPrice : null,
+    categoryFromFile: String(out.category || '').trim(),
     subcategoryFromFile: String(out.subcategory || '').trim(),
     description: String(out.description || '').trim(),
     image: String(out.image || '').trim() || 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=600&q=80'
   };
 }
 
+// Case/whitespace-insensitive match of a category string typed into a
+// spreadsheet against the real category list, so "suspension parts",
+// "Suspension  Parts", etc. all resolve to the canonical name.
+function resolveCategory(rawCategory) {
+  const norm = normalizeKey(rawCategory);
+  if (!norm) return null;
+  return CATEGORIES.find(c => normalizeKey(c) === norm) || null;
+}
+
+// Same idea for subcategory, scoped to whichever category it belongs
+// to. Falls back to the raw text as-is if it doesn't match one of the
+// known subcategories for that category (subcategory is free text).
+function resolveSubcategory(category, rawSubcategory) {
+  const trimmed = String(rawSubcategory || '').trim();
+  if (!trimmed) return '';
+  const known = CATEGORY_STRUCTURE[category] || [];
+  const norm = normalizeKey(trimmed);
+  const match = known.find(s => normalizeKey(s) === norm);
+  return match || trimmed;
+}
+
+// Persistent on-screen status inside the bulk-upload box — used instead
+// of relying solely on alert(), since alert() can be silently blocked or
+// easy to miss on some mobile browsers.
+function showBulkStatus(message, type) {
+  const el = document.getElementById('bulkUploadStatus');
+  if (!el) return;
+  const styles = {
+    info:    'border-slate-600 bg-slate-800/60 text-slate-300',
+    success: 'border-emerald-600/50 bg-emerald-900/30 text-emerald-300',
+    error:   'border-red-600/50 bg-red-900/30 text-red-300'
+  };
+  el.className = 'mt-3 text-xs rounded-lg p-3 border ' + (styles[type] || styles.info);
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
 // Appends normalized products to the draft (existing products untouched) and refreshes the table.
-function addBulkRows(rows, sourceLabel, imagesFoundCount) {
+function addBulkRows(rows, sourceLabel, imagesFoundCount, categoryCounts) {
   const products = loadDraftProducts();
   rows.forEach(rawRow => {
     products.push({ ...rawRow, id: nextProductId(products) });
   });
   saveDraftProducts(products);
   renderAdminTable();
-  alert(`${sourceLabel}: added ${rows.length} product(s) to your draft` +
-    (imagesFoundCount ? ` (${imagesFoundCount} picked up an embedded photo automatically)` : '') +
-    `.\n\nRemember: this is still a draft. Click "Export Product Data" and push the file to GitHub to make it live.`);
+
+  const breakdown = Object.entries(categoryCounts)
+    .map(([cat, n]) => `${n} in ${cat}`)
+    .join(', ');
+
+  const message = `✓ ${sourceLabel}: added ${rows.length} product(s) to your draft (${breakdown})` +
+    (imagesFoundCount ? `. ${imagesFoundCount} picked up an embedded photo automatically` : '') +
+    `.\n\nThis is still a DRAFT — it only lives in this browser. Click "Export Product Data" above, then upload the downloaded products-data.json to your GitHub repo to make it live.`;
+
+  showBulkStatus(message, 'success');
 }
 
 // xlsx files are zip archives. This digs into xl/drawings + xl/media to
@@ -326,35 +374,60 @@ async function extractEmbeddedImages(arrayBuffer) {
   return rowImages;
 }
 
-// Main entry point: reads an xlsx/csv file, applies the Category/Subcategory
-// currently selected in the modal to every row, and pulls in any pasted-in
-// photos automatically.
-async function importBulkExcelForCategory(file, category, subcategory) {
+// Main entry point: reads an xlsx/csv file. Each row can carry its own
+// Category (and Subcategory) — rows that specify one are filed there;
+// rows that don't fall back to whatever's picked in the modal. Also
+// pulls in any pasted-in photos automatically.
+async function importBulkExcelForCategory(file, fallbackCategory, fallbackSubcategory) {
+  showBulkStatus(`Reading "${file.name}"...`, 'info');
   try {
     const arrayBuffer = await file.arrayBuffer();
 
-    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    let workbook;
+    try {
+      workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    } catch (e) {
+      throw new Error('This file could not be parsed as an Excel/CSV file. Make sure it\'s a real .xlsx, .xls, or .csv file (not renamed, not a Google Sheets link).');
+    }
+
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet) throw new Error('No sheet found in this file.');
+
     // header:1 -> array-of-arrays, so row indexes line up with Excel's own row numbers.
     const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
     if (raw.length < 2) throw new Error('No product rows found (need a header row plus at least one product row).');
 
     const headers = raw[0];
     const headerLookup = buildHeaderLookup(headers);
+    if (!Object.values(headerLookup).includes('name') || !Object.values(headerLookup).includes('price')) {
+      throw new Error('Could not find a "Name" and "Price" column. Check your header row matches the expected column names.');
+    }
     const dataRows = raw.slice(1);
 
     const rowImages = file.name.toLowerCase().endsWith('.csv') ? {} : await extractEmbeddedImages(arrayBuffer);
     let imagesFoundCount = 0;
+    let skippedCount = 0;
+    let fallbackUsedCount = 0;
+    const categoryCounts = {};
 
     const normalized = [];
     dataRows.forEach((rowArr, idx) => {
       const rawRow = {};
       headers.forEach((h, i) => { rawRow[h] = rowArr[i] !== undefined ? rowArr[i] : ''; });
       const product = normalizeRow(rawRow, headerLookup);
-      if (!product) return;
-      product.category = category;
-      product.subcategory = product.subcategoryFromFile || subcategory || '';
+      if (!product) { skippedCount++; return; }
+
+      const resolvedCategory = resolveCategory(product.categoryFromFile) || fallbackCategory;
+      if (!resolveCategory(product.categoryFromFile)) fallbackUsedCount++;
+      product.category = resolvedCategory;
+      product.subcategory = product.subcategoryFromFile
+        ? resolveSubcategory(resolvedCategory, product.subcategoryFromFile)
+        : (fallbackSubcategory || '');
+      delete product.categoryFromFile;
       delete product.subcategoryFromFile;
+
+      categoryCounts[resolvedCategory] = (categoryCounts[resolvedCategory] || 0) + 1;
+
       // Header is Excel row 0, so this data row is Excel row (idx + 1).
       const excelRow = idx + 1;
       if (rowImages[excelRow]) {
@@ -364,11 +437,18 @@ async function importBulkExcelForCategory(file, category, subcategory) {
       normalized.push(product);
     });
 
-    if (normalized.length === 0) throw new Error('No valid rows found — every row needs at least a Name and a Price.');
+    if (normalized.length === 0) {
+      throw new Error(`No valid rows found — every row needs at least a Name and a Price. (${skippedCount} row(s) were skipped for missing these.)`);
+    }
 
-    addBulkRows(normalized, `Excel bulk upload (${category}${subcategory ? ' / ' + subcategory : ''})`, imagesFoundCount);
+    let sourceLabel = `Excel bulk upload (${file.name})`;
+    if (skippedCount > 0) sourceLabel += ` — ${skippedCount} row(s) skipped (missing Name/Price)`;
+    if (fallbackUsedCount > 0) sourceLabel += ` — ${fallbackUsedCount} row(s) used the fallback category "${fallbackCategory}" (no valid Category column value)`;
+
+    addBulkRows(normalized, sourceLabel, imagesFoundCount, categoryCounts);
   } catch (err) {
-    alert('Could not read this file: ' + err.message);
+    console.error('Bulk upload failed:', err);
+    showBulkStatus('✗ Could not read this file: ' + err.message, 'error');
   }
 }
 
@@ -379,7 +459,7 @@ async function importBulkExcelForCategory(file, category, subcategory) {
    Files app, or clicking the box and pasting (Ctrl/Cmd+V) a
    file that's on the clipboard.
    ========================================================= */
-function setupDropAndPasteZone({ zoneEl, accepts, onFile, activeClasses, clickOpensFileInput }) {
+function setupDropAndPasteZone({ zoneEl, accepts, onFile, activeClasses, clickOpensFileInput, onReject }) {
   if (!zoneEl) return;
 
   const setActive = (on) => {
@@ -389,7 +469,8 @@ function setupDropAndPasteZone({ zoneEl, accepts, onFile, activeClasses, clickOp
   const handleFile = (file) => {
     if (!file) return;
     if (!accepts(file)) {
-      alert(`"${file.name}" isn't a supported file type for this box.`);
+      const msg = `"${file.name}" isn't a supported file type for this box.`;
+      if (onReject) onReject(msg); else alert(msg);
       return;
     }
     onFile(file);
@@ -475,6 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const subcategory = document.getElementById('pSubcategory').value.trim();
       importBulkExcelForCategory(file, category, subcategory);
     },
+    onReject: (msg) => showBulkStatus('✗ ' + msg + ' Use .xlsx, .xls, or .csv.', 'error'),
     activeClasses: ['border-emerald-400', 'bg-slate-800/60'],
     clickOpensFileInput: document.getElementById('pBulkExcelInput')
   });
