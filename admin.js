@@ -141,6 +141,20 @@ function closeProductModal() {
   document.getElementById('productModal').classList.add('hidden');
 }
 
+// Opens the same Add/Edit modal but scrolls straight to the Excel/CSV
+// box and gives it a brief highlight, since that's what people are
+// looking for when they click the dashboard's "Bulk Upload" button.
+function openBulkUploadModal() {
+  openProductModal();
+  setTimeout(() => {
+    const zone = document.getElementById('bulkDropzone');
+    if (!zone) return;
+    zone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    zone.classList.add('ring-2', 'ring-emerald-400');
+    setTimeout(() => zone.classList.remove('ring-2', 'ring-emerald-400'), 1500);
+  }, 100);
+}
+
 function discardDraftClick() {
   if (!confirm('Discard all unpublished changes in this browser and reload the current live catalogue?')) return;
   discardDraft();
