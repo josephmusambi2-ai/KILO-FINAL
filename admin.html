@@ -69,9 +69,9 @@
                 <button onclick="exportProducts()" class="bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition inline-flex items-center gap-2">
                     <i class="fa-solid fa-file-export"></i> Export Product Data
                 </button>
-                <label class="bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition inline-flex items-center gap-2 cursor-pointer">
+                <label id="jsonImportDropzone" class="bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition inline-flex items-center gap-2 cursor-pointer border border-dashed border-transparent">
                     <i class="fa-solid fa-file-import"></i> Import Product Data
-                    <input type="file" accept="application/json" id="importFileInput" class="hidden">
+                    <input type="file" accept=".json,application/json" id="importFileInput" class="hidden">
                 </label>
                 <button onclick="discardDraftClick()" class="text-slate-500 hover:text-red-400 text-sm font-semibold px-4 py-2.5 rounded-lg transition inline-flex items-center gap-2" title="Throw away unsaved draft edits and reload from the live site">
                     <i class="fa-solid fa-rotate-left"></i> Discard Draft
@@ -148,13 +148,16 @@
                         </div>
                     </div>
 
-                    <div class="bg-slate-900/60 border border-dashed border-emerald-600/40 rounded-lg p-4">
+                    <div id="bulkDropzone" class="bg-slate-900/60 border border-dashed border-emerald-600/40 rounded-lg p-4 transition cursor-pointer" tabindex="0">
                         <p class="text-xs text-slate-300 mb-1"><i class="fa-solid fa-file-excel text-emerald-500 mr-1"></i> <strong>Or add many parts at once</strong> — upload an Excel file and every row in it becomes a product in the Category/Subcategory picked above.</p>
                         <p class="text-[11px] text-slate-500 mb-3">Columns needed: <code class="text-emerald-400">Name</code>, <code class="text-emerald-400">Price</code>. Optional: <code class="text-emerald-400">Brand</code>, <code class="text-emerald-400">OriginalPrice</code>, <code class="text-emerald-400">Description</code>, <code class="text-emerald-400">Image</code> (a photo link — or just paste actual pictures into the cells and they'll be pulled out automatically). You don't need Category/Subcategory columns — the picker above handles that.</p>
-                        <label class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition cursor-pointer">
-                            <i class="fa-solid fa-upload"></i> Upload XLSX / CSV
-                            <input type="file" accept=".xlsx,.xls,.csv" id="pBulkExcelInput" class="hidden">
-                        </label>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <label class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition cursor-pointer">
+                                <i class="fa-solid fa-upload"></i> Choose File
+                                <input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,application/csv" id="pBulkExcelInput" class="hidden">
+                            </label>
+                            <span id="bulkDropzoneHint" class="text-[11px] text-slate-500">...or drag a file here, or click anywhere in this box and paste (Ctrl/Cmd+V)</span>
+                        </div>
                     </div>
 
                     <div>

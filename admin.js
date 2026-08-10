@@ -358,6 +358,72 @@ async function importBulkExcelForCategory(file, category, subcategory) {
   }
 }
 
+/* =========================================================
+   Reusable drag-and-drop + clipboard-paste helper.
+   Lets a box accept a file three ways: the normal file-picker
+   button inside it, dragging a file onto it from the desktop/
+   Files app, or clicking the box and pasting (Ctrl/Cmd+V) a
+   file that's on the clipboard.
+   ========================================================= */
+function setupDropAndPasteZone({ zoneEl, accepts, onFile, activeClasses, clickOpensFileInput }) {
+  if (!zoneEl) return;
+
+  const setActive = (on) => {
+    activeClasses.forEach(c => zoneEl.classList.toggle(c, on));
+  };
+
+  const handleFile = (file) => {
+    if (!file) return;
+    if (!accepts(file)) {
+      alert(`"${file.name}" isn't a supported file type for this box.`);
+      return;
+    }
+    onFile(file);
+  };
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    zoneEl.addEventListener(evt, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActive(true);
+    });
+  });
+
+  ['dragleave', 'dragend'].forEach(evt => {
+    zoneEl.addEventListener(evt, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActive(false);
+    });
+  });
+
+  zoneEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActive(false);
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    handleFile(file);
+  });
+
+  // Click-to-focus so paste (below) knows this box is the target,
+  // and optionally opens the real file picker for accessibility.
+  zoneEl.addEventListener('click', (e) => {
+    // Don't double-trigger when the click landed on the actual <label>/<input>
+    // inside the zone — that already opens its own file picker.
+    if (e.target.closest('label')) return;
+    zoneEl.focus();
+    if (clickOpensFileInput) clickOpensFileInput.click();
+  });
+
+  zoneEl.addEventListener('paste', (e) => {
+    const items = e.clipboardData && e.clipboardData.files;
+    if (items && items[0]) {
+      e.preventDefault();
+      handleFile(items[0]);
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem(SESSION_KEY) === '1') {
     showDashboard();
@@ -378,6 +444,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const subcategory = document.getElementById('pSubcategory').value.trim();
     importBulkExcelForCategory(file, category, subcategory);
     e.target.value = '';
+  });
+
+  setupDropAndPasteZone({
+    zoneEl: document.getElementById('jsonImportDropzone'),
+    accepts: (file) => /\.json$/i.test(file.name) || file.type === 'application/json',
+    onFile: (file) => importProducts(file),
+    activeClasses: ['border-emerald-500', 'bg-slate-700']
+  });
+
+  setupDropAndPasteZone({
+    zoneEl: document.getElementById('bulkDropzone'),
+    accepts: (file) => /\.(xlsx|xls|csv)$/i.test(file.name),
+    onFile: (file) => {
+      const category = document.getElementById('pCategory').value;
+      const subcategory = document.getElementById('pSubcategory').value.trim();
+      importBulkExcelForCategory(file, category, subcategory);
+    },
+    activeClasses: ['border-emerald-400', 'bg-slate-800/60'],
+    clickOpensFileInput: document.getElementById('pBulkExcelInput')
   });
 
   // Image file -> base64 preview
