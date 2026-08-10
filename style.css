@@ -1,0 +1,42 @@
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 20s linear infinite;
+}
+
+/* Horizontal sliding product rail used on the Home page */
+.product-rail {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.5rem;
+}
+.product-rail::-webkit-scrollbar { height: 8px; }
+.product-rail::-webkit-scrollbar-track { background: #0f172a; border-radius: 999px; }
+.product-rail::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+.product-rail::-webkit-scrollbar-thumb:hover { background: #dc2626; }
+
+.rail-card {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+  width: 260px;
+}
+
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

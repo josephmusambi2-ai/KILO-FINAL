@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kilo Auto Spares Ltd — Witu Rd, Brunei House</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans">
+
+    <div id="topBars"></div>
+    <div id="siteHeader"></div>
+
+    <!-- Hero -->
+    <section class="bg-gradient-to-r from-slate-950 via-slate-900 to-red-950 text-white py-16 px-4 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto text-center">
+            <span class="bg-red-500/10 text-red-400 text-xs font-semibold px-3 py-1 rounded-full border border-red-500/20 uppercase tracking-widest">Home of Quality, Durable and Affordable Parts</span>
+            <h1 class="text-4xl sm:text-6xl font-black tracking-tight mt-4 mb-4">Kilo Auto Spares Ltd</h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto mb-8">Confirm stock availability instantly via call or WhatsApp. Visit our shop at Witu Road, off Lusaka Road, Brunei House.</p>
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="shop.html" class="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-3.5 rounded-lg shadow-lg transition inline-flex items-center space-x-2">
+                    <span>Browse Full Catalogue</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </a>
+                <a id="heroWaLink" href="#" target="_blank" rel="noopener" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-3.5 rounded-lg shadow-lg transition inline-flex items-center space-x-2">
+                    <i class="fa-brands fa-whatsapp text-lg"></i>
+                    <span>Confirm Availability via WhatsApp</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Category Grid -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14">
+        <div class="mb-8 text-center">
+            <h2 class="text-2xl sm:text-3xl font-bold text-white">Shop by Category</h2>
+            <p class="text-sm text-slate-400 mt-1">Every system we stock parts for — tap a category to browse.</p>
+        </div>
+        <div id="categoryGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+    </section>
+
+    <!-- Category Rails -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="mb-10 text-center">
+            <h2 class="text-2xl sm:text-3xl font-bold text-white">Latest From Each Category</h2>
+            <p class="text-sm text-slate-400 mt-1">A quick look at what we stock — head to the Shop page for the full catalogue.</p>
+        </div>
+        <div id="categoryRails" class="space-y-12"></div>
+    </main>
+
+    <div id="cartDrawerContainer"></div>
+    <div id="quickViewContainer"></div>
+    <div id="floatingWhatsApp"></div>
+    <div id="siteFooter"></div>
+
+    <script src="products.js"></script>
+    <script src="layout.js"></script>
+    <script src="cart.js"></script>
+    <script>
+        initLayout('index.html');
+        document.getElementById('heroWaLink').href = waLink("Hello, I'm inquiring about spare parts availability.");
+
+        function renderProductCard(product) {
+            const pct = discountPercent(product);
+            return `
+                <div class="rail-card bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col hover:border-slate-700 transition shadow-lg">
+                    <div class="h-40 overflow-hidden bg-slate-900 relative group">
+                        <img src="${product.image}" alt="${product.name}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-300">
+                        <span class="absolute top-3 left-3 bg-slate-900/90 text-slate-300 text-xs font-semibold px-2.5 py-1 rounded border border-slate-700">${product.subcategory}</span>
+                        ${pct > 0 ? `<span class="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">-${pct}%</span>` : ''}
+                        <button onclick="openQuickView(${product.id})" class="absolute inset-x-3 bottom-3 bg-slate-950/90 hover:bg-slate-900 text-white text-xs font-semibold py-2 rounded-lg opacity-0 group-hover:opacity-100 transition flex items-center justify-center space-x-1.5 border border-slate-700">
+                            <i class="fa-solid fa-eye"></i><span>Quick View</span>
+                        </button>
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                            ${product.brand ? `<span class="text-xs text-slate-500 font-semibold uppercase tracking-wide">${product.brand}</span>` : ''}
+                            <h3 class="font-semibold text-white mt-1 mb-2 text-sm leading-snug line-clamp-2">${product.name}</h3>
+                            <p class="mb-3">
+                                ${pct > 0 ? `<span class="text-slate-500 line-through text-xs mr-2">KES ${product.originalPrice.toLocaleString()}</span>` : ''}
+                                <span class="text-red-500 font-extrabold text-base">KES ${product.price.toLocaleString()}</span>
+                            </p>
+                        </div>
+                        <button onclick="addToCart(${product.id})" class="w-full bg-slate-800 hover:bg-red-600 text-white py-2 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-cart-plus"></i>
+                            <span>Add to Inquiry Cart</span>
+                        </button>
+                    </div>
+                </div>`;
+        }
+
+        function renderCategoryGrid() {
+            const products = loadProducts();
+            const grid = document.getElementById('categoryGrid');
+            grid.innerHTML = CATEGORIES.map(category => {
+                const count = products.filter(p => p.category === category).length;
+                return `
+                    <a href="shop.html?category=${encodeURIComponent(category)}" class="bg-slate-950 border border-slate-800 hover:border-red-500/50 rounded-xl p-5 flex flex-col items-center text-center transition group">
+                        <div class="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-3 group-hover:bg-red-500/20 transition">
+                            <i class="${CATEGORY_ICONS[category] || 'fa-solid fa-gear'} text-red-500 text-lg"></i>
+                        </div>
+                        <h3 class="text-sm font-bold text-white leading-snug">${category}</h3>
+                        <p class="text-xs text-slate-500 mt-1">${count} product${count === 1 ? '' : 's'}</p>
+                    </a>`;
+            }).join('');
+        }
+
+        function renderCategoryRails() {
+            const products = loadProducts();
+            const container = document.getElementById('categoryRails');
+            container.innerHTML = '';
+
+            CATEGORIES.forEach(category => {
+                const items = products.filter(p => p.category === category).slice(0, 6);
+                if (items.length === 0) return;
+
+                const section = document.createElement('section');
+                section.innerHTML = `
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold text-white">${category}</h3>
+                        <a href="shop.html?category=${encodeURIComponent(category)}" class="text-sm font-semibold text-red-400 hover:text-red-300 transition inline-flex items-center space-x-1">
+                            <span>View all</span><i class="fa-solid fa-chevron-right text-xs"></i>
+                        </a>
+                    </div>
+                    <div class="product-rail">
+                        ${items.map(renderProductCard).join('')}
+                    </div>
+                `;
+                container.appendChild(section);
+            });
+        }
+
+        renderCategoryGrid();
+        renderCategoryRails();
+    </script>
+</body>
+</html>

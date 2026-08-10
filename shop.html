@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop — Kilo Auto Spares Ltd</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans">
+
+    <div id="topBars"></div>
+    <div id="siteHeader"></div>
+
+    <section class="bg-slate-950 border-b border-slate-800 py-10 px-4">
+        <div class="max-w-7xl mx-auto">
+            <h1 class="text-3xl sm:text-4xl font-black text-white mb-2">Shop Our Parts Catalogue</h1>
+            <p class="text-slate-400 text-sm max-w-2xl">Browse every part in stock. Filter by system, search by name, and confirm availability directly on WhatsApp before you travel to the shop.</p>
+        </div>
+    </section>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 border-b border-slate-800 pb-6">
+            <!-- Search Bar -->
+            <div class="w-full lg:max-w-md">
+                <div class="relative w-full">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" id="searchInput" placeholder="Search parts, brakes, suspension, filters..." class="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition">
+                </div>
+            </div>
+
+            <!-- Category Filters -->
+            <div id="categoryFilters" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Subcategory Filters (shown once a category is picked) -->
+        <div id="subcategoryFilters" class="flex flex-wrap gap-2 mb-8"></div>
+
+        <!-- Product Grid -->
+        <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+    </main>
+
+    <div id="cartDrawerContainer"></div>
+    <div id="quickViewContainer"></div>
+    <div id="floatingWhatsApp"></div>
+    <div id="siteFooter"></div>
+
+    <script src="products.js"></script>
+    <script src="layout.js"></script>
+    <script src="cart.js"></script>
+    <script>
+        initLayout('shop.html');
+
+        let currentCategory = 'all';
+        let currentSubcategory = 'all';
+        let searchQuery = '';
+
+        // Pick up ?category=Suspension+Parts&sub=Shock+Absorbers from the
+        // Home page rails or the header mega-menu.
+        const params = new URLSearchParams(window.location.search);
+        const preselect = params.get('category');
+        const preselectSub = params.get('sub');
+        if (preselect && CATEGORIES.includes(preselect)) currentCategory = preselect;
+        if (preselectSub) currentSubcategory = preselectSub;
+
+        function renderFilters() {
+            const filtersEl = document.getElementById('categoryFilters');
+            const all = [{ label: 'All Parts', value: 'all' }, ...CATEGORIES.map(c => ({ label: c, value: c }))];
+            filtersEl.innerHTML = all.map(c => {
+                const active = c.value === currentCategory;
+                return `<button data-category="${c.value}" class="filter-btn px-4 py-2 text-sm font-semibold rounded-lg transition ${active ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">${c.label}</button>`;
+            }).join('');
+
+            filtersEl.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    currentCategory = e.currentTarget.getAttribute('data-category');
+                    currentSubcategory = 'all';
+                    renderFilters();
+                    renderSubcategoryFilters();
+                    renderProducts();
+                });
+            });
+        }
+
+        function renderSubcategoryFilters() {
+            const subEl = document.getElementById('subcategoryFilters');
+            if (currentCategory === 'all' || !CATEGORY_STRUCTURE[currentCategory]) {
+                subEl.innerHTML = '';
+                return;
+            }
+            const subs = [{ label: 'All ' + currentCategory, value: 'all' }, ...CATEGORY_STRUCTURE[currentCategory].map(s => ({ label: s, value: s }))];
+            subEl.innerHTML = subs.map(s => {
+                const active = s.value === currentSubcategory;
+                return `<button data-subcategory="${s.value}" class="sub-filter-btn px-3 py-1.5 text-xs font-semibold rounded-full transition border ${active ? 'bg-red-600/20 border-red-500 text-red-400' : 'bg-transparent border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'}">${s.label}</button>`;
+            }).join('');
+
+            subEl.querySelectorAll('.sub-filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    currentSubcategory = e.currentTarget.getAttribute('data-subcategory');
+                    renderSubcategoryFilters();
+                    renderProducts();
+                });
+            });
+        }
+
+        function productCard(product) {
+            const pct = discountPercent(product);
+            return `
+                <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col hover:border-slate-700 transition shadow-lg">
+                    <div class="h-48 overflow-hidden bg-slate-900 relative group">
+                        <img src="${product.image}" alt="${product.name}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-300">
+                        ${product.subcategory ? `<span class="absolute top-3 left-3 bg-slate-900/90 text-slate-300 text-xs font-semibold px-2.5 py-1 rounded border border-slate-700">${product.subcategory}</span>` : ''}
+                        ${pct > 0 ? `<span class="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">-${pct}%</span>` : ''}
+                        <button onclick="openQuickView(${product.id})" class="absolute inset-x-3 bottom-3 bg-slate-950/90 hover:bg-slate-900 text-white text-xs font-semibold py-2 rounded-lg opacity-0 group-hover:opacity-100 transition flex items-center justify-center space-x-1.5 border border-slate-700">
+                            <i class="fa-solid fa-eye"></i><span>Quick View</span>
+                        </button>
+                    </div>
+                    <div class="p-5 flex-1 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-red-400 font-bold uppercase tracking-wider">${product.category}</span>
+                            ${product.brand ? `<span class="text-xs text-slate-500 font-semibold uppercase tracking-wide"> &middot; ${product.brand}</span>` : ''}
+                            <h3 class="font-semibold text-white mt-1 mb-1 text-base leading-snug">${product.name}</h3>
+                            ${product.description ? `<p class="text-xs text-slate-500 mb-2 line-clamp-2">${product.description}</p>` : ''}
+                            <p class="mb-4">
+                                ${pct > 0 ? `<span class="text-slate-500 line-through text-xs mr-2">KES ${product.originalPrice.toLocaleString()}</span>` : ''}
+                                <span class="text-red-500 font-extrabold text-lg">KES ${product.price.toLocaleString()}</span>
+                            </p>
+                        </div>
+                        <div class="space-y-2">
+                            <button onclick="addToCart(${product.id})" class="w-full bg-slate-800 hover:bg-red-600 text-white py-2 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-cart-plus"></i>
+                                <span>Add to Inquiry Cart</span>
+                            </button>
+                            <a href="${waLink(`Hello, is this part available? - ${product.name} (KES ${product.price.toLocaleString()})`)}" target="_blank" rel="noopener" class="w-full bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white py-2 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-2 border border-emerald-500/30">
+                                <i class="fa-brands fa-whatsapp"></i>
+                                <span>Confirm Availability</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderProducts() {
+            const products = loadProducts();
+            const productGrid = document.getElementById('productGrid');
+
+            const filtered = products.filter(product => {
+                const matchesCategory = currentCategory === 'all' || product.category === currentCategory;
+                const matchesSubcategory = currentSubcategory === 'all' || product.subcategory === currentSubcategory;
+                const haystack = `${product.name} ${product.subcategory} ${product.brand || ''}`.toLowerCase();
+                const matchesSearch = haystack.includes(searchQuery.toLowerCase());
+                return matchesCategory && matchesSubcategory && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                productGrid.innerHTML = `<div class="col-span-full text-center py-16 text-slate-500"><i class="fa-solid fa-triangle-exclamation text-3xl mb-2"></i><p>No auto parts found matching your criteria.</p></div>`;
+                return;
+            }
+
+            productGrid.innerHTML = filtered.map(productCard).join('');
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            renderProducts();
+        });
+
+        renderFilters();
+        renderSubcategoryFilters();
+        renderProducts();
+    </script>
+</body>
+</html>
