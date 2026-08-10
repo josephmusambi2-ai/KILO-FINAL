@@ -197,10 +197,11 @@ function importProducts(file) {
 const FIELD_ALIASES = {
   name: ['name', 'productname', 'title', 'part', 'partname'],
   brand: ['brand', 'make', 'manufacturer'],
-  price: ['price', 'sellingprice', 'cost', 'kes', 'amount'],
+  price: ['price', 'sellingprice', 'cost', 'kes', 'kshs', 'pricekshs', 'amount'],
   originalprice: ['originalprice', 'oldprice', 'wasprice', 'rrp', 'listprice', 'beforeprice'],
-  description: ['description', 'desc', 'details', 'notes'],
-  image: ['image', 'imageurl', 'photo', 'photourl', 'picture', 'img']
+  subcategory: ['subcategory', 'sub', 'subcat'],
+  description: ['description', 'desc', 'details', 'notes', 'makemodel', 'compatibility', 'compatiblewith'],
+  image: ['image', 'imageurl', 'photo', 'photourl', 'picture', 'img', 'productimagelink']
 };
 
 function normalizeKey(s) {
@@ -231,7 +232,8 @@ function normalizeRow(rawRow, headerLookup) {
   });
 
   const name = String(out.name || '').trim();
-  const price = parseFloat(String(out.price || '').replace(/[^0-9.]/g, ''));
+  const priceRaw = (out.price !== undefined && out.price !== null) ? out.price : '';
+  const price = parseFloat(String(priceRaw).replace(/[^0-9.]/g, ''));
   if (!name || isNaN(price)) return null;
 
   const originalPriceRaw = out.originalprice;
@@ -242,6 +244,7 @@ function normalizeRow(rawRow, headerLookup) {
     brand: String(out.brand || '').trim(),
     price,
     originalPrice: (originalPrice && originalPrice > price) ? originalPrice : null,
+    subcategoryFromFile: String(out.subcategory || '').trim(),
     description: String(out.description || '').trim(),
     image: String(out.image || '').trim() || 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=600&q=80'
   };
@@ -336,7 +339,8 @@ async function importBulkExcelForCategory(file, category, subcategory) {
       const product = normalizeRow(rawRow, headerLookup);
       if (!product) return;
       product.category = category;
-      product.subcategory = subcategory || '';
+      product.subcategory = product.subcategoryFromFile || subcategory || '';
+      delete product.subcategoryFromFile;
       // Header is Excel row 0, so this data row is Excel row (idx + 1).
       const excelRow = idx + 1;
       if (rowImages[excelRow]) {
